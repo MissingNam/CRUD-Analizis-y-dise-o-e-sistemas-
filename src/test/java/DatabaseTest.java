@@ -14,7 +14,7 @@ class DatabaseTest {
     @BeforeAll
     void setUp() throws SQLException {
         db = new Database();
-        conn = db.connect("root", "TU_PASSWORD"); // usa agenda_test
+        conn = db.connect("usuario3", "superpassword"); // usa agenda_test
         limpiarTablas();
     }
 
