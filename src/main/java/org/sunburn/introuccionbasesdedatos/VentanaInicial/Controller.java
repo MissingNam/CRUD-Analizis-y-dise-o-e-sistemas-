@@ -54,34 +54,47 @@ public class Controller{
 
     public void consulta() throws SQLException {
 
-        Statement stmt = null;
-        ResultSet rs = null;
+        StringBuilder texto = new StringBuilder();
+        texto.append("=== LISTADO DE PERSONAS ===\n\n");
 
-
-        System.out.println("\n=== LISTADO DE PERSONAS ===");
-        stmt = database.getConnection().createStatement();
-        rs = stmt.executeQuery("SELECT * FROM Personas");
+        Statement stmt = database.getConnection().createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT * FROM Personas");
 
         while (rs.next()) {
             int id = rs.getInt("id");
             String nombre = rs.getString("nombre");
             String direccion = rs.getString("direccion");
 
-            System.out.println("ID: " + id + ", Nombre: " + nombre + ", Dirección: " + direccion);
+            texto.append("ID: ").append(id)
+                    .append(", Nombre: ").append(nombre)
+                    .append(", Dirección: ").append(direccion).append("\n");
 
-            // 4. Consultar los teléfonos de cada persona
-            System.out.println("  Teléfonos:");
+            texto.append("  Teléfonos:\n");
+
             Statement stmtTelefonos = database.getConnection().createStatement();
             ResultSet rsTelefonos = stmtTelefonos.executeQuery(
                     "SELECT telefono FROM Telefonos WHERE personaId = " + id);
 
             while (rsTelefonos.next()) {
-                System.out.println("    - " + rsTelefonos.getString("telefono"));
+                texto.append("    - ")
+                        .append(rsTelefonos.getString("telefono"))
+                        .append("\n");
             }
+
+            texto.append("\n");
+
             rsTelefonos.close();
             stmtTelefonos.close();
         }
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Consulta");
+        alert.setHeaderText("Listado de personas");
+        alert.setContentText(texto.toString());
+
+        alert.showAndWait();
     }
+
 
     public void solicitarAlta()
     {
