@@ -63,11 +63,20 @@ public class Controller{
         while (rs.next()) {
             int id = rs.getInt("id");
             String nombre = rs.getString("nombre");
-            String direccion = rs.getString("direccion");
+            int direccion = rs.getInt("direccion");
+            String direccionStr = "placeHolder";
+
+            Statement stmtDireccion = database.getConnection().createStatement();
+            ResultSet rsDireccion = stmtDireccion.executeQuery(
+                    "SELECT * FROM Direcciones WHERE id = " + direccion);
+            while (rsDireccion.next()) {
+                direccionStr =  rsDireccion.getString("direccion");
+            }
+
 
             texto.append("ID: ").append(id)
                     .append(", Nombre: ").append(nombre)
-                    .append(", Dirección: ").append(direccion).append("\n");
+                    .append(", Dirección: ").append(direccionStr).append("\n");
 
             texto.append("  Teléfonos:\n");
 
