@@ -27,25 +27,34 @@ public class Database {
 
     public void realizarAlta(String nombre, String direccion, String telefono) throws SQLException {
 
-        int idDireccion = obtenerIdDireccion(direccion);
-
-        String sqlPersona = "INSERT INTO Personas (nombre, direccion) VALUES (?, ?)";
+        // 1. Insertar persona
+        String sqlPersona = "INSERT INTO Personas (nombre) VALUES (?)";
         PreparedStatement psPersona = conn.prepareStatement(
                 sqlPersona,
                 Statement.RETURN_GENERATED_KEYS
         );
-
         psPersona.setString(1, nombre);
-        psPersona.setInt(2, idDireccion);
         psPersona.executeUpdate();
 
-        ResultSet rsKeys = psPersona.getGeneratedKeys();
-        rsKeys.next();
-        int idPersona = rsKeys.getInt(1);
+        ResultSet rsPersona = psPersona.getGeneratedKeys();
+        rsPersona.next();
+        int idPersona = rsPersona.getInt(1);
 
-        rsKeys.close();
+        rsPersona.close();
         psPersona.close();
 
+        // 2. Obtener o crear dirección
+        int idDireccion = obtenerIdDireccion(direccion);
+
+        // 3. Relacionar persona-dirección
+        String sqlRelacion = "INSERT INTO PersonaDireccion (personaId, direccionId) VALUES (?, ?)";
+        PreparedStatement psRelacion = conn.prepareStatement(sqlRelacion);
+        psRelacion.setInt(1, idPersona);
+        psRelacion.setInt(2, idDireccion);
+        psRelacion.executeUpdate();
+        psRelacion.close();
+
+        // 4. Insertar teléfono
         String sqlTelefono = "INSERT INTO Telefonos (personaId, telefono) VALUES (?, ?)";
         PreparedStatement psTelefono = conn.prepareStatement(sqlTelefono);
         psTelefono.setInt(1, idPersona);
@@ -53,7 +62,6 @@ public class Database {
         psTelefono.executeUpdate();
         psTelefono.close();
     }
-
 
 
     public void realizarBaja(String nombre) throws SQLException {
@@ -89,18 +97,80 @@ public class Database {
         psInsert.close();
     }
 
-    public void modificarUsuario(String nombreOG, String nombreNW, String direccionNW) throws SQLException {
+    public void modificarUsuario(String nombreOG, String nombreNW) throws SQLException {
 
-        int idDireccion = obtenerIdDireccion(direccionNW);
 
-        String sql = "UPDATE Personas SET nombre = ?, direccion = ? WHERE nombre = ?";
+        String sql = "UPDATE Personas SET nombre = ? WHERE nombre = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, nombreNW);
-        ps.setInt(2, idDireccion);
-        ps.setString(3, nombreOG);
+        ps.setString(2, nombreOG);
 
         ps.executeUpdate();
         ps.close();
+    }
+
+    public void insertarDireccion(String nombre, String direccion)throws SQLException
+    {
+        int direccionID = obtenerIdDireccion(direccion);
+        int nombreID = 0;
+
+        String sql = "SELECT id FROM Personas WHERE nombre = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, nombre);
+        ResultSet rs = ps.executeQuery();
+
+        if (rs.next()) {
+            nombreID = rs.getInt(1);
+        }
+
+        rs.close();
+        ps.close();
+
+        String sql2 = "INSERT INTO PersonaDireccion (personaId, direccion) VALUES (?, ?)\n";
+        PreparedStatement ps2 = conn.prepareStatement(sql2);
+        ps2.setInt(1, nombreID);
+        ps2.setInt(2, direccionID);
+        ps2.executeUpdate();
+
+        ps2.close();
+    }
+
+    public void eliminarDireccion(String nombre, String direccion) throws SQLException
+    {
+        // buscar la direccion sin insertarla porque obtenerID la inserta si no esta
+        int direccionID = 0;
+
+
+        String sql = "SELECT id FROM direcciones WHERE direccion = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1,direccion);
+        ResultSet rs = ps.executeQuery();
+        if (rs.next()) {
+            direccionID = rs.getInt(1);
+        }
+        rs.close();
+        ps.close();
+
+        // luego buscamos al usuario
+        int usuarioID = 0;
+        String sql2 = "SELECT id FROM personas WHERE nombre = ?";
+        PreparedStatement ps2 = conn.prepareStatement(sql2);
+        ps2.setString(1,nombre);
+        ResultSet rs2 = ps2.executeQuery();
+        if (rs2.next()) {
+            usuarioID = rs2.getInt(1);
+        }
+
+        rs2.close();
+        ps2.close();
+
+        String sql3 = "DELETE FROM PersonaDireccion WHERE personaId = ? AND direccion = ?";
+        PreparedStatement ps3 = conn.prepareStatement(sql3);
+        ps3.setInt(1, usuarioID);
+        ps3.setInt(2, direccionID);
+        ps3.executeUpdate();
+        ps3.close();
+
     }
 
 
@@ -128,7 +198,7 @@ public class Database {
 
     private int obtenerIdDireccion(String direccion) throws SQLException {
 
-        // 1. Buscar si la dirección ya existe
+        // Buscar si la dirección ya existe
         String sqlSelect = "SELECT id FROM Direcciones WHERE direccion = ?";
         PreparedStatement psSelect = conn.prepareStatement(sqlSelect);
         psSelect.setString(1, direccion);
@@ -144,7 +214,7 @@ public class Database {
         rs.close();
         psSelect.close();
 
-        // 2. Si no existe, insertarla
+        // Si no existe, insertarla
         String sqlInsert = "INSERT INTO Direcciones (direccion) VALUES (?)";
         PreparedStatement psInsert = conn.prepareStatement(
                 sqlInsert,

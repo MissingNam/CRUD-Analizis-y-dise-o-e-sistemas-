@@ -57,52 +57,69 @@ public class Controller{
         StringBuilder texto = new StringBuilder();
         texto.append("=== LISTADO DE PERSONAS ===\n\n");
 
+        String sql = """
+        SELECT 
+            p.id,
+            p.nombre,
+            d.direccion,
+            t.telefono
+        FROM Personas p
+        LEFT JOIN PersonaDireccion pd ON p.id = pd.personaId
+        LEFT JOIN Direcciones d ON pd.direccionId = d.id
+        LEFT JOIN Telefonos t ON p.id = t.personaId
+        ORDER BY p.id
+        """;
+
         Statement stmt = database.getConnection().createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT * FROM Personas");
+        ResultSet rs = stmt.executeQuery(sql);
+
+        int personaActual = -1;
 
         while (rs.next()) {
             int id = rs.getInt("id");
             String nombre = rs.getString("nombre");
-            int direccion = rs.getInt("direccion");
-            String direccionStr = "placeHolder";
+            String direccion = rs.getString("direccion");
+            String telefono = rs.getString("telefono");
 
-            Statement stmtDireccion = database.getConnection().createStatement();
-            ResultSet rsDireccion = stmtDireccion.executeQuery(
-                    "SELECT * FROM Direcciones WHERE id = " + direccion);
-            while (rsDireccion.next()) {
-                direccionStr =  rsDireccion.getString("direccion");
+            // Nueva persona
+            if (id != personaActual) {
+                personaActual = id;
+
+                texto.append("ID: ").append(id)
+                        .append(", Nombre: ").append(nombre).append("\n");
+
+                texto.append("  Direcciones:\n");
+                if (direccion != null) {
+                    texto.append("    - ").append(direccion).append("\n");
+                }
+
+                texto.append("  Teléfonos:\n");
+                if (telefono != null) {
+                    texto.append("    - ").append(telefono).append("\n");
+                }
+
+                texto.append("\n");
+            } else {
+                // Misma persona, más datos
+                if (direccion != null) {
+                    texto.append("    - ").append(direccion).append("\n");
+                }
+                if (telefono != null) {
+                    texto.append("    - ").append(telefono).append("\n");
+                }
             }
-
-
-            texto.append("ID: ").append(id)
-                    .append(", Nombre: ").append(nombre)
-                    .append(", Dirección: ").append(direccionStr).append("\n");
-
-            texto.append("  Teléfonos:\n");
-
-            Statement stmtTelefonos = database.getConnection().createStatement();
-            ResultSet rsTelefonos = stmtTelefonos.executeQuery(
-                    "SELECT telefono FROM Telefonos WHERE personaId = " + id);
-
-            while (rsTelefonos.next()) {
-                texto.append("    - ")
-                        .append(rsTelefonos.getString("telefono"))
-                        .append("\n");
-            }
-
-            texto.append("\n");
-
-            rsTelefonos.close();
-            stmtTelefonos.close();
         }
+
+        rs.close();
+        stmt.close();
 
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Consulta");
         alert.setHeaderText("Listado de personas");
         alert.setContentText(texto.toString());
-
         alert.showAndWait();
     }
+
 
 
     public void solicitarAlta()
@@ -198,11 +215,11 @@ public class Controller{
         // Campos de texto
         TextField txtNombreOG = new TextField();
         TextField txtNombreNW = new TextField();
-        TextField txtDireccionNW = new TextField();
+
 
         txtNombreOG.setPromptText("Nombre Original");
         txtNombreNW.setPromptText("Nombre Nuevo");
-        txtDireccionNW.setPromptText("Direccion Nueva");
+
 
         // Layout
         GridPane grid = new GridPane();
@@ -213,8 +230,7 @@ public class Controller{
         grid.add(txtNombreOG, 1, 0);
         grid.add(new Label("Nombre Nuevo:"), 0, 1);
         grid.add(txtNombreNW, 1, 1);
-        grid.add(new Label("Direccion Nueva:"), 0, 2);
-        grid.add(txtDireccionNW, 1, 2);
+
 
         dialog.getDialogPane().setContent(grid);
 
@@ -223,15 +239,66 @@ public class Controller{
             if (response == ButtonType.OK) {
                 String nombreOGText = txtNombreOG.getText();
                 String nombreNWText = txtNombreNW.getText();
-                String direccionNWText = txtDireccionNW.getText();
 
-                try{database.modificarUsuario(nombreOGText,nombreNWText,direccionNWText);} catch (SQLException e) {
+
+                try{database.modificarUsuario(nombreOGText,nombreNWText);} catch (SQLException e) {
                     throw new RuntimeException(e);
                 }
             }
         });
-
     }
+
+    public void solicitarAñadirDireccion()
+    {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Ingresar datos");
+        dialog.setHeaderText("Introduce la información");
+
+        // Botones
+        dialog.getDialogPane().getButtonTypes().addAll(
+                ButtonType.OK, ButtonType.CANCEL
+        );
+
+        // Campos de texto
+        TextField txtNombre = new TextField();
+        TextField txtDireccion = new TextField();
+
+        txtNombre.setPromptText("Nombre");
+        txtDireccion.setPromptText("Direccion");
+
+        // Layout
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+
+        grid.add(new Label("Nombre a añadir:"), 0, 0);
+        grid.add(txtNombre, 1, 0);
+        grid.add(new Label("Direccion Nueva:"), 0, 1);
+        grid.add(txtDireccion, 1, 1);
+
+
+        dialog.getDialogPane().setContent(grid);
+
+        // Mostrar y esperar respuesta
+        dialog.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                String nombreOGText = txtNombre.getText();
+                String direccionNWText = txtDireccion.getText();
+
+                try{database.insertarDireccion(nombreOGText,direccionNWText);} catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+    }
+
+
+
+
+
+
+
+
 
     public void solicitarAñadirTelefono()
     {
@@ -276,6 +343,53 @@ public class Controller{
             }
         });
     }
+
+    public void solicitarEliminarDireccion()
+    {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Ingresar datos");
+        dialog.setHeaderText("Introduce la información");
+
+        // Botones
+        dialog.getDialogPane().getButtonTypes().addAll(
+                ButtonType.OK, ButtonType.CANCEL
+        );
+
+        // Campos de texto
+        TextField txtNombre = new TextField();
+        TextField txtDireccion = new TextField();
+
+        txtNombre.setPromptText("Nombre");
+        txtDireccion.setPromptText("Direccion");
+
+        // Layout
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+
+        grid.add(new Label("De quien?:"), 0, 0);
+        grid.add(txtNombre, 1, 0);
+        grid.add(new Label("Cual Direccion:"), 0, 1);
+        grid.add(txtDireccion, 1, 1);
+
+
+        dialog.getDialogPane().setContent(grid);
+
+        // Mostrar y esperar respuesta
+        dialog.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                String nombreOGText = txtNombre.getText();
+                String direccionText = txtDireccion.getText();
+
+                try{database.eliminarDireccion(nombreOGText,direccionText);} catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+    }
+
+
+
 
     public void solicitarEliminarTelefono()
     {
