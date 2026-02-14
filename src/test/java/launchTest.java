@@ -1,5 +1,3 @@
-import org.sunburn.introuccionbasesdedatos.Database;
-
 import java.sql.SQLException;
 
 public class launchTest {

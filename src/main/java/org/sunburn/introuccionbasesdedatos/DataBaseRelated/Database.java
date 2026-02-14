@@ -1,15 +1,11 @@
-package org.sunburn.introuccionbasesdedatos;
+package org.sunburn.introuccionbasesdedatos.DataBaseRelated;
 
 import java.sql.*;
 
 public class Database {
     private static Connection conn;
 
-    public Connection connect(String user, String pass) throws SQLException {
-        conn = DriverManager.getConnection(
-                "jdbc:mariadb://localhost:3306/agenda2", user, pass);
-        return conn;
-    }
+
 
     public Connection getConnection() {
         return conn;
@@ -126,7 +122,7 @@ public class Database {
         rs.close();
         ps.close();
 
-        String sql2 = "INSERT INTO PersonaDireccion (personaId, direccion) VALUES (?, ?)\n";
+        String sql2 = "INSERT INTO PersonaDireccion (personaId, direccionId) VALUES (?, ?)\n";
         PreparedStatement ps2 = conn.prepareStatement(sql2);
         ps2.setInt(1, nombreID);
         ps2.setInt(2, direccionID);
@@ -164,7 +160,7 @@ public class Database {
         rs2.close();
         ps2.close();
 
-        String sql3 = "DELETE FROM PersonaDireccion WHERE personaId = ? AND direccion = ?";
+        String sql3 = "DELETE FROM PersonaDireccion WHERE personaId = ? AND direccionId = ?";
         PreparedStatement ps3 = conn.prepareStatement(sql3);
         ps3.setInt(1, usuarioID);
         ps3.setInt(2, direccionID);
@@ -231,6 +227,73 @@ public class Database {
         psInsert.close();
 
         return idDireccion;
+    }
+
+
+
+
+    public String generateReport() throws SQLException
+    {
+        StringBuilder texto = new StringBuilder();
+        texto.append("=== LISTADO DE PERSONAS ===\n\n");
+
+        String sql = """
+        SELECT 
+            p.id,
+            p.nombre,
+            d.direccion,
+            t.telefono
+        FROM Personas p
+        LEFT JOIN PersonaDireccion pd ON p.id = pd.personaId
+        LEFT JOIN Direcciones d ON pd.direccionId = d.id
+        LEFT JOIN Telefonos t ON p.id = t.personaId
+        ORDER BY p.id
+        """;
+
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery(sql);
+
+        int personaActual = -1;
+
+        while (rs.next()) {
+            int id = rs.getInt("id");
+            String nombre = rs.getString("nombre");
+            String direccion = rs.getString("direccion");
+            String telefono = rs.getString("telefono");
+
+            // Nueva persona
+            if (id != personaActual) {
+                personaActual = id;
+
+                texto.append("ID: ").append(id)
+                        .append(", Nombre: ").append(nombre).append("\n");
+
+                texto.append("  Direcciones:\n");
+                if (direccion != null) {
+                    texto.append("    - ").append(direccion).append("\n");
+                }
+
+                texto.append("  Teléfonos:\n");
+                if (telefono != null) {
+                    texto.append("    - ").append(telefono).append("\n");
+                }
+
+                texto.append("\n");
+            } else {
+                // Misma persona, más datos
+                if (direccion != null) {
+                    texto.append("    - ").append(direccion).append("\n");
+                }
+                if (telefono != null) {
+                    texto.append("    - ").append(telefono).append("\n");
+                }
+            }
+        }
+
+        rs.close();
+        stmt.close();
+
+        return texto.toString();
     }
 
 

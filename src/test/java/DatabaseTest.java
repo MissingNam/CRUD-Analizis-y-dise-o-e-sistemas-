@@ -1,5 +1,8 @@
 import org.junit.jupiter.api.*;
-import org.sunburn.introuccionbasesdedatos.Database;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.DataBaseConnection;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.Database;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.IPersonaRepository;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.PersonaRepository;
 
 import java.sql.*;
 
@@ -8,12 +11,17 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DatabaseTest {
 
-    private Database db;
+    private DataBaseConnection db;
     private Connection conn;
+
+    private IPersonaRepository pR;
+
 
     @BeforeAll
     void setUp() throws SQLException {
-        db = new Database();
+        db = new DataBaseConnection();
+        conn = db.getConnection();
+        pR = new PersonaRepository(conn);
         conn = db.connect("usuario3", "superpassword"); // usa agenda_test
         limpiarTablas();
     }
@@ -39,7 +47,7 @@ class DatabaseTest {
     @Test
     void testRealizarAlta() throws SQLException {
 
-        db.realizarAlta("Juan", "Calle 1", "12345");
+        pR.realizarAlta("Juan", "Calle 1", "12345");
 
         PreparedStatement ps = conn.prepareStatement(
                 "SELECT COUNT(*) FROM Personas WHERE nombre = ?"
@@ -55,8 +63,8 @@ class DatabaseTest {
     @Test
     void testInsertarTelefono() throws SQLException {
 
-        db.realizarAlta("Ana", "Calle 2", "11111");
-        db.insertarTelefono("Ana", "22222");
+        pR.realizarAlta("Ana", "Calle 2", "11111");
+        pR.insertarTelefono("Ana", "22222");
 
         PreparedStatement ps = conn.prepareStatement(
                 "SELECT COUNT(*) FROM Telefonos"
@@ -71,8 +79,8 @@ class DatabaseTest {
     @Test
     void testEliminarTelefono() throws SQLException {
 
-        db.realizarAlta("Luis", "Calle 3", "33333");
-        db.eliminarTelefono("Luis", "33333");
+        pR.realizarAlta("Luis", "Calle 3", "33333");
+        pR.eliminarTelefono("Luis", "33333");
 
         PreparedStatement ps = conn.prepareStatement(
                 "SELECT COUNT(*) FROM Telefonos"
@@ -87,8 +95,8 @@ class DatabaseTest {
     @Test
     void testRealizarBaja() throws SQLException {
 
-        db.realizarAlta("Pedro", "Calle 4", "44444");
-        db.realizarBaja("Pedro");
+        pR.realizarAlta("Pedro", "Calle 4", "44444");
+        pR.realizarBaja("Pedro");
 
         PreparedStatement ps = conn.prepareStatement(
                 "SELECT COUNT(*) FROM Personas"

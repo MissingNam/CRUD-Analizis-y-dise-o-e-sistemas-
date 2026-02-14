@@ -5,18 +5,24 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
-import org.sunburn.introuccionbasesdedatos.Database;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.DataBaseConnection;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.IPersonaRepository;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.IReportService;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.PersonaRepository;
+import org.sunburn.introuccionbasesdedatos.DataBaseRelated.ReportService;
+
 import java.io.IOException;
-import java.sql.ResultSet;
+import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Optional;
 
-public class Controller{
+public class Controller {
 
-    Database database = new Database();
+    public IPersonaRepository personaRepo;
+    public IReportService reportService;
+    private DataBaseConnection dbConnection = new DataBaseConnection();
+
+    private UIDialogService UIService = new UIDialogService();
 
     @FXML
     private Button loginButton;
@@ -26,414 +32,42 @@ public class Controller{
     private TextField passwordField;
 
     @FXML
-    public void startAll(ActionEvent event) throws IOException {
-
+    public void startAll(ActionEvent event) {
         try {
-            database.connect(
-                    usernameField.getText(),
-                    passwordField.getText()
-            );
+            dbConnection.connect(usernameField.getText(), passwordField.getText());
+            Connection conn = dbConnection.getConnection();
+
+            IPersonaRepository personaRepo  = new PersonaRepository(conn);
+            IReportService     reportService = new ReportService(conn);
 
             FXMLLoader loader = new FXMLLoader(
                     getClass().getResource("/org/sunburn/introuccionbasesdedatos/VentanaInicial/MainWindow.fxml")
             );
 
+            // 1. Carga el FXML
+            Scene scene = new Scene(loader.load());
+
+            // 2. Obtén el Controller que JavaFX creó para esa ventana
+            MainWindowController mainController = loader.getController();
+
+            // 3. Pásale las dependencias
+            mainController.init(personaRepo, reportService);
+
+            // 4. Muestra la ventana
             Stage stage = (Stage) loginButton.getScene().getWindow();
-            stage.setScene(new Scene(loader.load()));
+            stage.setScene(scene);
             stage.setTitle("Ventana Principal");
-            stage.setOnCloseRequest(events -> {
-                Database.close();
-            });
+            stage.setOnCloseRequest(e -> DataBaseConnection.close());
 
         } catch (SQLException e) {
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setContentText("Usuario o contraseña incorrectos");
             alert.showAndWait();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    public void consulta() throws SQLException {
-
-        StringBuilder texto = new StringBuilder();
-        texto.append("=== LISTADO DE PERSONAS ===\n\n");
-
-        String sql = """
-        SELECT 
-            p.id,
-            p.nombre,
-            d.direccion,
-            t.telefono
-        FROM Personas p
-        LEFT JOIN PersonaDireccion pd ON p.id = pd.personaId
-        LEFT JOIN Direcciones d ON pd.direccionId = d.id
-        LEFT JOIN Telefonos t ON p.id = t.personaId
-        ORDER BY p.id
-        """;
-
-        Statement stmt = database.getConnection().createStatement();
-        ResultSet rs = stmt.executeQuery(sql);
-
-        int personaActual = -1;
-
-        while (rs.next()) {
-            int id = rs.getInt("id");
-            String nombre = rs.getString("nombre");
-            String direccion = rs.getString("direccion");
-            String telefono = rs.getString("telefono");
-
-            // Nueva persona
-            if (id != personaActual) {
-                personaActual = id;
-
-                texto.append("ID: ").append(id)
-                        .append(", Nombre: ").append(nombre).append("\n");
-
-                texto.append("  Direcciones:\n");
-                if (direccion != null) {
-                    texto.append("    - ").append(direccion).append("\n");
-                }
-
-                texto.append("  Teléfonos:\n");
-                if (telefono != null) {
-                    texto.append("    - ").append(telefono).append("\n");
-                }
-
-                texto.append("\n");
-            } else {
-                // Misma persona, más datos
-                if (direccion != null) {
-                    texto.append("    - ").append(direccion).append("\n");
-                }
-                if (telefono != null) {
-                    texto.append("    - ").append(telefono).append("\n");
-                }
-            }
-        }
-
-        rs.close();
-        stmt.close();
-
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Consulta");
-        alert.setHeaderText("Listado de personas");
-        alert.setContentText(texto.toString());
-        alert.showAndWait();
-    }
-
-
-
-    public void solicitarAlta()
-    {
-
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Ingresar datos");
-        dialog.setHeaderText("Introduce la información");
-
-        // Botones
-        dialog.getDialogPane().getButtonTypes().addAll(
-                ButtonType.OK, ButtonType.CANCEL
-        );
-
-        // Campos de texto
-        TextField txtNombre = new TextField();
-        TextField txtDireccion = new TextField();
-        TextField txtTelefono = new TextField();
-
-        txtNombre.setPromptText("Nombre");
-        txtDireccion.setPromptText("Dirección");
-        txtTelefono.setPromptText("Teléfono");
-
-        // Layout
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-
-        grid.add(new Label("Nombre:"), 0, 0);
-        grid.add(txtNombre, 1, 0);
-        grid.add(new Label("Dirección:"), 0, 1);
-        grid.add(txtDireccion, 1, 1);
-        grid.add(new Label("Teléfono:"), 0, 2);
-        grid.add(txtTelefono, 1, 2);
-
-        dialog.getDialogPane().setContent(grid);
-
-        // Mostrar y esperar respuesta
-        dialog.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.OK) {
-                String nombre = txtNombre.getText();
-                String direccion = txtDireccion.getText();
-                String telefono = txtTelefono.getText();
-
-                // Aquí ya tienes los strings
-                System.out.println("Nombre: " + nombre);
-                System.out.println("Dirección: " + direccion);
-                System.out.println("Teléfono: " + telefono);
-
-                try{database.realizarAlta(nombre,direccion,telefono);} catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-
-
-    }
-
-    public void solicitarBaja()
-    {
-        TextInputDialog dialog = new TextInputDialog();
-        dialog.setTitle("Entrada de datos");
-        dialog.setHeaderText("Ingrese el nombre a eliminar");
-        dialog.setContentText("Nombre:");
-
-        Optional<String> resultado = dialog.showAndWait();
-
-        if (resultado.isPresent()) {
-            String texto = resultado.get();
-            try{database.realizarBaja(texto);} catch (SQLException e) {e.printStackTrace();}
-        } else {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText("Error");
-            alert.setContentText("No existe el nombre");
-            alert.showAndWait();
-            solicitarBaja();
-        }
-
-    }
-
-    public void solicitarCambio()
-    {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Ingresar datos");
-        dialog.setHeaderText("Introduce la información");
-
-        // Botones
-        dialog.getDialogPane().getButtonTypes().addAll(
-                ButtonType.OK, ButtonType.CANCEL
-        );
-
-        // Campos de texto
-        TextField txtNombreOG = new TextField();
-        TextField txtNombreNW = new TextField();
-
-
-        txtNombreOG.setPromptText("Nombre Original");
-        txtNombreNW.setPromptText("Nombre Nuevo");
-
-
-        // Layout
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-
-        grid.add(new Label("Nombre Previo:"), 0, 0);
-        grid.add(txtNombreOG, 1, 0);
-        grid.add(new Label("Nombre Nuevo:"), 0, 1);
-        grid.add(txtNombreNW, 1, 1);
-
-
-        dialog.getDialogPane().setContent(grid);
-
-        // Mostrar y esperar respuesta
-        dialog.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.OK) {
-                String nombreOGText = txtNombreOG.getText();
-                String nombreNWText = txtNombreNW.getText();
-
-
-                try{database.modificarUsuario(nombreOGText,nombreNWText);} catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-    }
-
-    public void solicitarAñadirDireccion()
-    {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Ingresar datos");
-        dialog.setHeaderText("Introduce la información");
-
-        // Botones
-        dialog.getDialogPane().getButtonTypes().addAll(
-                ButtonType.OK, ButtonType.CANCEL
-        );
-
-        // Campos de texto
-        TextField txtNombre = new TextField();
-        TextField txtDireccion = new TextField();
-
-        txtNombre.setPromptText("Nombre");
-        txtDireccion.setPromptText("Direccion");
-
-        // Layout
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-
-        grid.add(new Label("Nombre a añadir:"), 0, 0);
-        grid.add(txtNombre, 1, 0);
-        grid.add(new Label("Direccion Nueva:"), 0, 1);
-        grid.add(txtDireccion, 1, 1);
-
-
-        dialog.getDialogPane().setContent(grid);
-
-        // Mostrar y esperar respuesta
-        dialog.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.OK) {
-                String nombreOGText = txtNombre.getText();
-                String direccionNWText = txtDireccion.getText();
-
-                try{database.insertarDireccion(nombreOGText,direccionNWText);} catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-    }
-
-
-
-
-
-
-
-
-
-    public void solicitarAñadirTelefono()
-    {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Ingresar datos");
-        dialog.setHeaderText("Introduce la información");
-
-        // Botones
-        dialog.getDialogPane().getButtonTypes().addAll(
-                ButtonType.OK, ButtonType.CANCEL
-        );
-
-        // Campos de texto
-        TextField txtNombre = new TextField();
-        TextField txtTelefono = new TextField();
-
-        txtNombre.setPromptText("Nombre");
-        txtTelefono.setPromptText("Telefono");
-
-        // Layout
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-
-        grid.add(new Label("Nombre a añadir:"), 0, 0);
-        grid.add(txtNombre, 1, 0);
-        grid.add(new Label("Telefono Nuevo:"), 0, 1);
-        grid.add(txtTelefono, 1, 1);
-
-
-        dialog.getDialogPane().setContent(grid);
-
-        // Mostrar y esperar respuesta
-        dialog.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.OK) {
-                String nombreOGText = txtNombre.getText();
-                String nombreNWText = txtTelefono.getText();
-
-                try{database.insertarTelefono(nombreOGText,nombreNWText);} catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-    }
-
-    public void solicitarEliminarDireccion()
-    {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Ingresar datos");
-        dialog.setHeaderText("Introduce la información");
-
-        // Botones
-        dialog.getDialogPane().getButtonTypes().addAll(
-                ButtonType.OK, ButtonType.CANCEL
-        );
-
-        // Campos de texto
-        TextField txtNombre = new TextField();
-        TextField txtDireccion = new TextField();
-
-        txtNombre.setPromptText("Nombre");
-        txtDireccion.setPromptText("Direccion");
-
-        // Layout
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-
-        grid.add(new Label("De quien?:"), 0, 0);
-        grid.add(txtNombre, 1, 0);
-        grid.add(new Label("Cual Direccion:"), 0, 1);
-        grid.add(txtDireccion, 1, 1);
-
-
-        dialog.getDialogPane().setContent(grid);
-
-        // Mostrar y esperar respuesta
-        dialog.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.OK) {
-                String nombreOGText = txtNombre.getText();
-                String direccionText = txtDireccion.getText();
-
-                try{database.eliminarDireccion(nombreOGText,direccionText);} catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-    }
-
-
-
-
-    public void solicitarEliminarTelefono()
-    {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Ingresar datos");
-        dialog.setHeaderText("Introduce la información");
-
-        // Botones
-        dialog.getDialogPane().getButtonTypes().addAll(
-                ButtonType.OK, ButtonType.CANCEL
-        );
-
-        // Campos de texto
-        TextField txtNombre = new TextField();
-        TextField txtTelefono = new TextField();
-
-        txtNombre.setPromptText("Nombre");
-        txtTelefono.setPromptText("Telefono");
-
-        // Layout
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-
-        grid.add(new Label("De quien?:"), 0, 0);
-        grid.add(txtNombre, 1, 0);
-        grid.add(new Label("Cual Telefono:"), 0, 1);
-        grid.add(txtTelefono, 1, 1);
-
-
-        dialog.getDialogPane().setContent(grid);
-
-        // Mostrar y esperar respuesta
-        dialog.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.OK) {
-                String nombreOGText = txtNombre.getText();
-                String nombreNWText = txtTelefono.getText();
-
-                try{database.eliminarTelefono(nombreOGText,nombreNWText);} catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-    }
 
 
 }

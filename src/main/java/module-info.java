@@ -9,4 +9,6 @@ module org.sunburn.introuccionbasesdedatos {
     exports org.sunburn.introuccionbasesdedatos;
     exports org.sunburn.introuccionbasesdedatos.VentanaInicial;
     opens org.sunburn.introuccionbasesdedatos.VentanaInicial to javafx.fxml;
+    exports org.sunburn.introuccionbasesdedatos.DataBaseRelated;
+    opens org.sunburn.introuccionbasesdedatos.DataBaseRelated to javafx.fxml;
 }
